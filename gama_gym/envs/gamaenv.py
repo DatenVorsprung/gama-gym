@@ -10,7 +10,7 @@ import numpy as np
 import numpy.typing as npt
 from typing import Optional
 from gym import spaces
-from ray.thirdparty_files import psutil
+import psutil
 
 
 from gama_client.client import GamaClient
