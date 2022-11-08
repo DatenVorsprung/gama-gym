@@ -12,6 +12,12 @@ pip install -e .
 ```
 https://github.com/gama-platform/gama/releases/
 ```
+
+Gama-gym uses Gama in headless mode so you would need to give execution rights to the headless directory. 
+For example, in a linux environment:
+```
+chmod +x {GAMA_PATH}/headless/gama-headless.sh
+```
 ## Basic usage
 You can use gama-gym as any gym environment. You need to pass gama-gym configuration as following:
 ```
