@@ -58,4 +58,15 @@ import gym
 from ray.rllib.agents.ppo import PPOTrainer #Import from rllib the algorithm you want to use, in this case PPO
 from ray.tune.registry import register_env # Import for registering the environment
 from gama_gym.envs import GamaEnv #Import the environment to use
+
+# register the custom environment in ray
+env = 'GamaEnv-v0'
+register_env(env, lambda config: GamaEnv(headless_directory      = {HEADLESS_DIR},
+                          headless_script_path    = {HEADLESS_SCRIPT_PATH},
+                          gaml_experiment_path    = {GAML_FILE_PATH},
+                          gaml_experiment_name    = {EXPERIMENT_NAME},
+                          gama_server_url         = "localhost",
+                          gama_server_port        = 6868,
+                          )             )
+
 ```
