@@ -1,6 +1,6 @@
 # gama-gym
 ## Installation instructions
-
+* Gama (by now working with version GAMA_1.8.2_Linux_with_JDK_09.16.22_972c449b)
 * Python
 * The following Python packages:
   * gym==0.23.1
