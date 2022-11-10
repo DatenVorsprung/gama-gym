@@ -48,3 +48,13 @@ env = gym.make('GamaEnv-v0',
              gama_server_port        = 6868)
 
 ```
+
+## Usage with rllib
+In what follows we provide a brief example of how to use gama-gym with rllib.
+
+```
+import gym
+from ray.rllib.agents.ppo import PPOTrainer #Import from rllib the algorithm you want to use, in this case PPO
+from ray.tune.registry import register_env # Import for registering the environment
+from gama_gym.envs import GamaEnv #Import the environment to use
+```
