@@ -1,6 +1,10 @@
 # gama-gym
 ## Installation instructions
-1. Install gama-gym package
+- [ ] Python
+- [ ] The following Python packages:
+
+### Dependencies
+### Install gama-gym package
 Note: remember to activate your python virtual environment before installing the package
 
 Once you cloned/downloaded the repository, from the root project directory:
@@ -8,7 +12,8 @@ Once you cloned/downloaded the repository, from the root project directory:
 ```
 pip install -e .
 ```
-2. Download Gama with JDK (Baptiste, JDK is required isnt?)
+
+### Download Gama with JDK (Baptiste, JDK is required isnt?)
 ```
 https://github.com/gama-platform/gama/releases/
 ```
