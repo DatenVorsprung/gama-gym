@@ -9,12 +9,20 @@
   * gym==0.23.1
 
 ### Install gama-gym package
-Note: remember to activate your python virtual environment before installing the package
 
-Once you cloned/downloaded the repository, from the root project directory:
+
+Clone/download the gama-gym repository in your computer:
 
 ```
-pip install -e .
+git clone git@github.com:gama-platform/gama-gym.git {GAMA_GYM_DIR}
+```
+
+
+Then you can install it in your local project environment by calling:
+Note: remember to activate your python virtual environment before installing the package
+
+```
+pip install -e {GAMA_GYM_DIR}
 ```
 
 ### Download Gama with JDK (Baptiste, JDK is required isnt?)
