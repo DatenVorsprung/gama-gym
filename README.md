@@ -39,6 +39,7 @@ chmod +x {GAMA_PATH}/headless/gama-headless.sh
 You can use gama-gym as any gym environment. You need to pass gama-gym configuration as following:
 ```
 import gym
+from gama_gym.envs import GamaEnv #Import the environment to use
 env = gym.make('GamaEnv-v0',
              headless_directory      = {GAMA_PATH}/headless, # Root directory for gama headless
              headless_script_path    = {GAMA_PATH}/headless/gama-headless.sh, # Path to the script that runs gama headless
