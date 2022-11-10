@@ -1,7 +1,9 @@
 # gama-gym
 ## Installation instructions
+
 * Python
 * The following Python packages:
+  * gym==0.23.1
 
 ### Dependencies
 ### Install gama-gym package
