@@ -94,3 +94,10 @@ for _ in range(3):
 
 
 ```
+
+## Samples
+You will find in the samples folder several examples of use of the library.
+
+### Basic sample
+Contains some basic tests.
+
