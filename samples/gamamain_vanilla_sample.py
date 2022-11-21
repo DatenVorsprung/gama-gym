@@ -5,6 +5,7 @@ import gym
 import user_local_variables as lv
 import gama_gym 
 import numpy as np
+import tensorflow as tf
 parser = argparse.ArgumentParser(description='Runs the experiment for the gama policy design environment')
 parser.add_argument(
     "--num-iters",
@@ -154,7 +155,7 @@ if __name__ == "__main__":
             env = gym.make('GamaEnv-v0',
                 headless_directory      = lv.headless_dir,
                 headless_script_path    = lv.run_headless_script_path,
-                gaml_experiment_path    = r"/home/mvinyalssal/code/policy-design-server/Diffusion Innovation - Reinforcement learning/models/TCP_model_env_rc2.gaml",
+                gaml_experiment_path    = r"/home/mvinyalssal/Documents/policy-design-server/Diffusion Innovation - Reinforcement learning/models/TCP_model_env_rc2.gaml" ,
                 gaml_experiment_name    = "one_simulation",
                 gama_server_url         = "localhost",
                 gama_server_port        = 6868)
