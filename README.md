@@ -7,6 +7,8 @@
 * Python
 * The following Python packages:
   * gym==0.23.1
+* In case tensorf low is required for the policy learning:
+  * tensorflow==2.11 (some older versions are known to have problems)
 
 ### Install gama-gym package
 
