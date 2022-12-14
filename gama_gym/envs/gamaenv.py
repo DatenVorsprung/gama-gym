@@ -1,63 +1,53 @@
 import asyncio
 import subprocess
-
 import gym
 import time
 import sys
 import socket
-from _thread import *
+from _thread import start_new_thread
 import numpy as np
 import numpy.typing as npt
 from typing import Optional
 from gym import spaces
 import psutil
-
-
 from gama_client.client import GamaClient
 
 
-
 class GamaEnv(gym.Env):
-
-
     # USER LOCAL VARIABLES
     headless_dir: str               # Root directory for gama headless
     run_headless_script_path: str   # Path to the script that runs gama headless
     gaml_file_path: str             # Path to the gaml file containing the experiment/simulation to run
     experiment_name: str            # Name of the experiment to run
 
-
     # ENVIRONMENT CONSTANTS
-    max_episode_steps:  int     = 11
+    max_episode_steps: int = 11
 
     # Gama-server control variables
-    gama_server_url: str                    = ""
-    gama_server_port: int                   = -1
-    gama_server_handler: GamaClient         = None
-    gama_server_sock_id: str                = ""# represents the current socket used to communicate with gama-server
-    gama_server_exp_id: str                 = ""# represents the current experiment being manipulated by gama-server
-    gama_server_connected: asyncio.Event    = None
-    gama_server_event_loop                  = None
-    gama_server_pid: int                    = -1
+    gama_server_url: str = ""
+    gama_server_port: int = -1
+    gama_server_handler: GamaClient = None
+    gama_server_sock_id: str = ""  # represents the current socket used to communicate with gama-server
+    gama_server_exp_id: str = ""  # represents the current experiment being manipulated by gama-server
+    gama_server_connected: asyncio.Event = None
+    gama_server_event_loop = None
+    gama_server_pid: int = -1
 
     # Simulation execution variables
-    gama_socket                 = None
-    gama_simulation_as_file     = None # For some reason the typing doesn't work
-    gama_simulation_connection  = None # Resulting from socket create connection
-    def __init__(self,  headless_directory: str,
-                        headless_script_path: str,
-                        gaml_experiment_path: str,
-                        gaml_experiment_name: str,
-                        gama_server_url: str,
-                        gama_server_port:int,
-                 ):
+    gama_socket = None
+    gama_simulation_as_file = None  # For some reason the typing doesn't work
+    gama_simulation_connection = None  # Resulting from socket create connection
 
-        self.headless_dir               = headless_directory
-        self.run_headless_script_path   = headless_script_path
-        self.gaml_file_path             = gaml_experiment_path
-        self.experiment_name            = gaml_experiment_name
-        self.gama_server_url            = gama_server_url
-        self.gama_server_port           = gama_server_port
+    def __init__(self, headless_directory: str, headless_script_path: str,
+                 gaml_experiment_path: str, gaml_experiment_name: str,
+                 gama_server_url: str, gama_server_port: int):
+
+        self.headless_dir = headless_directory
+        self.run_headless_script_path = headless_script_path
+        self.gaml_file_path = gaml_experiment_path
+        self.experiment_name = gaml_experiment_name
+        self.gama_server_url = gama_server_url
+        self.gama_server_port = gama_server_port
 
         print("INIT")
         # OBSERVATION SPACE:
@@ -65,7 +55,7 @@ class GamaEnv(gym.Env):
         # 2. Fraction of adopters                           - Fraction of adopters [0,1]
         # 3. Remaining time before ending the simulation    - Unit (in steps)
         obs_high_bounds = np.array([50.0, 1.0, np.Inf])
-        obs_low_bounds  = np.array([0.0, 0.0, 0.0])
+        obs_low_bounds = np.array([0.0, 0.0, 0.0])
         self.observation_space = spaces.Box(obs_low_bounds, obs_high_bounds, dtype=np.float32)
         # ACTIONS:
         # 1. Thetaeconomy       - Fraction of financial support [0,1]
@@ -73,9 +63,9 @@ class GamaEnv(gym.Env):
         # 3. Fmanagement        - Fraction of individuals chosen randomly to be trained [0,1]
         # 4. Thetaenvironment   - Fraction of environmental awareness [0,1]
         # 5. Fenvironment       - Fraction of individuals chosen randomly to increase environmental awareness [0,1]
-        action_high_bounds  = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
-        action_low_bounds   = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
-        self.action_space   = spaces.Box(action_low_bounds, action_high_bounds, dtype=np.float32)
+        action_high_bounds = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
+        action_low_bounds = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
+        self.action_space = spaces.Box(action_low_bounds, action_high_bounds, dtype=np.float32)
 
         # setting an event loop for the parallel processes
         self.gama_server_event_loop = asyncio.new_event_loop()
@@ -105,11 +95,12 @@ class GamaEnv(gym.Env):
             try:
                 self.gama_server_event_loop.run_until_complete(asyncio.sleep(2))
                 print("try to connect")
-                self.gama_server_sock_id = self.gama_server_event_loop.run_until_complete(self.gama_server_handler.connect())
+                self.gama_server_sock_id = self.gama_server_event_loop.run_until_complete(
+                    self.gama_server_handler.connect())
                 if self.gama_server_sock_id != "":
                     print("connection successful", self.gama_server_sock_id)
                     break
-            except:
+            except Exception:
                 print("Connection failed")
 
         if self.gama_server_sock_id == "":
@@ -123,7 +114,7 @@ class GamaEnv(gym.Env):
             print("STEP")
             # sending actions
             str_action = GamaEnv.action_to_string(np.array(action)) + "\n"
-            print("model sending policy:(thetaeconomy ,thetamanagement,fmanagement,thetaenvironment,fenvironment)", str_action)
+            print("model sending policy:(thetaeconomy,thetamanagement,fmanagement,thetaenvironment,fenvironment)", str_action)
             print(self.gama_simulation_connection)
 
             self.gama_simulation_as_file.write(str_action)
@@ -131,7 +122,6 @@ class GamaEnv(gym.Env):
             print("model sent policy, now waiting for reward")
             # we wait for the reward
             policy_reward = self.gama_simulation_as_file.readline()
-            
             reward = float(policy_reward)
 
             print("model received reward:", policy_reward, " as a float: ", reward)
@@ -148,21 +138,21 @@ class GamaEnv(gym.Env):
                 self.gama_socket.close()
         except ConnectionResetError:
             print("connection reset, end of simulation")
-        except:
+        except Exception:
             print("EXCEPTION pendant l'execution")
             print(sys.exc_info()[0])
             sys.exit(-1)
         print("END STEP")
-        return np.array(self.state, dtype=np.float32), reward, end, {} 
+        return np.array(self.state, dtype=np.float32), reward, end, {}
 
     # Must reset the simulation to its initial state
     # Should return the initial observations
-    def reset(self, *, seed: Optional[int] = None, return_info: bool = False, options: Optional[dict] = None ):
+    def reset(self, *, seed: Optional[int] = None, return_info: bool = False, options: Optional[dict] = None):
         print("RESET")
         print("self.gama_simulation_as_file", self.gama_simulation_as_file)
         print("self.gama_simulation_connection",
               self.gama_simulation_connection)
-        #Check if the environment terminated 
+        # Check if the environment terminated
         if self.gama_simulation_connection is not None:
             print("self.gama_simulation_connection.fileno()",
                   self.gama_simulation_connection.fileno())
@@ -205,7 +195,7 @@ class GamaEnv(gym.Env):
     # Init the server + run gama
     async def run_gama_simulation(self):
 
-        #waiting for the gama_server websocket to be initialized
+        # Waiting for the gama_server websocket to be initialized
         await self.gama_server_connected.wait()
 
         print("creating TCP server")
@@ -214,15 +204,7 @@ class GamaEnv(gym.Env):
         # initialize the experiment
         try:
             print("asking gama-server to start the experiment")
-            self.gama_server_exp_id = await self.gama_server_handler.init_experiment(   self.gaml_file_path,
-                                                                                        self.experiment_name,
-                                                                                        params=[
-                                                                                                {
-                                                                                                    "type": "int",
-                                                                                                    "name": "port",
-                                                                                                    "value": sim_port
-                                                                                                }
-                                                                                        ])
+            self.gama_server_exp_id = await self.gama_server_handler.init_experiment(self.gaml_file_path, self.experiment_name, params=[{"type": "int", "name": "port", "value": sim_port}])
         except Exception as e:
             print("Unable to init the experiment: ", self.gaml_file_path, self.experiment_name, e)
             sys.exit(-1)
@@ -249,11 +231,11 @@ class GamaEnv(gym.Env):
 
         self.gama_socket = s
         return port
-  
+
     # Connect with the current running gama simulation
     def wait_for_gama_to_connect(self):
 
-        #The server is waiting for clients to connect
+        # The server is waiting for clients to connect
         self.gama_simulation_connection, addr = self.gama_socket.accept()
         print("gama connected:", self.gama_simulation_connection, addr)
         self.gama_simulation_as_file = self.gama_simulation_connection.makefile(mode='rw')
@@ -264,8 +246,8 @@ class GamaEnv(gym.Env):
         print("model received:", received_observations)
 
         over = "END" in received_observations
-        obs  = GamaEnv.string_to_nparray(received_observations.replace("END", ""))
-        #obs[2]  = float(self.n_times_4_action - self.i_experience)  # We change the last observation to be the number of times that remain for changing the policy
+        obs = GamaEnv.string_to_nparray(received_observations.replace("END", ""))
+        # obs[2]  = float(self.n_times_4_action - self.i_experience)  # We change the last observation to be the number of times that remain for changing the policy
 
         return obs, over
 
@@ -278,8 +260,52 @@ class GamaEnv(gym.Env):
         nbs = [float(nb) for nb in filter(lambda s: s.strip() != "", clean.split(','))]
         return np.array(nbs)
 
-
     # Converts an action to a string to be sent to the simulation
     @classmethod
     def action_to_string(cls, actions: npt.NDArray[np.float64]) -> str:
         return ",".join([str(action) for action in actions]) + "\n"
+
+    def _make_gym_spaces(self, key):
+        if key == 'action':
+            key_variables = self.action_variables
+        key_config = 'action'
+        key_data = self._config[key_config]
+
+        for key_variable in key_variables:
+            key_variable_dic = key_data[key_variable]
+            if 'type' not in [*key_variable_dic]:
+                raise ValueError(f'"type" must be specified for {key} variable "{key_variable}"')
+            type_ = key_variable_dic['type']
+            if type_ == 'array':
+                if 'subtype' not in [*key_variable_dic]:
+                    raise ValueError(f'"subtype" must be specified for {key} variable "{key_variable}"')
+                subtype = key_variable_dic['subtype']
+                if 'size' not in [*key_variable_dic]:
+                    raise ValueError(f'"size" must be specified for {key} variable "{key_variable}"')
+                size = key_variable_dic['size']
+                if subtype == 'float':
+                    if ('high' not in [*key_variable_dic]) or ('low' not in [*key_variable_dic]):
+                        raise ValueError(f'"high" and "low" must be specified for {key} variable "{key_variable}"')
+                    low = key_variable_dic['low']
+                    high = key_variable_dic['high']
+                    # space = spaces.Box(low=low, high=high, shape=(size,))
+                elif subtype == 'discrete':
+                    atomic_spaces = []
+                    if 'subsize' not in [*key_variable_dic]:
+                        raise ValueError(f'"subsize" must be specified for {key} variable "{key_variable}"')
+                    sub_size = key_variable_dic['subsize']
+                    for element in range(size):
+                        atomic_spaces.append(spaces.Discrete(sub_size))
+                    # space = spaces.Tuple(atomic_spaces)
+                elif subtype == 'int':
+                    if ('high' not in [*key_variable_dic]) or ('low' not in [*key_variable_dic]):
+                        raise ValueError(f'"high" and "low" must be specified for {key} variable "{key_variable}"')
+                    low = key_variable_dic['low']
+                    high = key_variable_dic['high']
+                    atomic_spaces = []
+                    sub_size = high - low + 1
+                    for element in range(size):
+                        atomic_spaces.append(spaces.Discrete(sub_size))
+                    # space = spaces.Tuple(atomic_spaces)
+                else:
+                    raise ValueError(f'{key} variable {key_variable} subtype {subtype} not in {["float", "int", "discrete"]}')
