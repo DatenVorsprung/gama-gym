@@ -89,7 +89,7 @@ results_filepath            = 'results_sum_rewards.csv'
 results2_filepath           = 'results_number_adopters.csv'
 results3_filepath           = 'results_actions.csv'
 results4_filepath           = 'results_nnoutputs.csv'
-
+CURRENT_DIRECTORY = os.path.abspath(os.getcwd())
 
 if __name__ == "__main__":
     
@@ -155,7 +155,7 @@ if __name__ == "__main__":
             env = gym.make('GamaEnv-v0',
                 headless_directory      = lv.headless_dir,
                 headless_script_path    = lv.run_headless_script_path,
-                gaml_experiment_path    = r"/home/mvinyalssal/Documents/policy-design-server/Diffusion Innovation - Reinforcement learning/models/TCP_model_env_rc2.gaml" ,
+                gaml_experiment_path    = CURRENT_DIRECTORY+r"/TCP_model_env_rc2.gaml",
                 gaml_experiment_name    = "one_simulation",
                 gama_server_url         = "localhost",
                 gama_server_port        = 6868)

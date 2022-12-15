@@ -11,7 +11,7 @@ from typing import Optional
 from gym import spaces
 import psutil
 from gama_client.client import GamaClient
-
+import yaml
 
 class GamaEnv(gym.Env):
     # USER LOCAL VARIABLES
@@ -40,7 +40,7 @@ class GamaEnv(gym.Env):
 
     def __init__(self, headless_directory: str, headless_script_path: str,
                  gaml_experiment_path: str, gaml_experiment_name: str,
-                 gama_server_url: str, gama_server_port: int):
+                 gama_server_url: str, env_yaml_config_path: str, gama_server_port: int):
 
         self.headless_dir = headless_directory
         self.run_headless_script_path = headless_script_path
@@ -49,23 +49,12 @@ class GamaEnv(gym.Env):
         self.gama_server_url = gama_server_url
         self.gama_server_port = gama_server_port
 
-        print("INIT")
-        # OBSERVATION SPACE:
-        # 1. Remaining budget                               - Remaining budget available to implement public policies
-        # 2. Fraction of adopters                           - Fraction of adopters [0,1]
-        # 3. Remaining time before ending the simulation    - Unit (in steps)
-        obs_high_bounds = np.array([50.0, 1.0, np.Inf])
-        obs_low_bounds = np.array([0.0, 0.0, 0.0])
-        self.observation_space = spaces.Box(obs_low_bounds, obs_high_bounds, dtype=np.float32)
-        # ACTIONS:
-        # 1. Thetaeconomy       - Fraction of financial support [0,1]
-        # 2. Thetamanagement    - Fraction of increment on the skill of trained agents [0,1]
-        # 3. Fmanagement        - Fraction of individuals chosen randomly to be trained [0,1]
-        # 4. Thetaenvironment   - Fraction of environmental awareness [0,1]
-        # 5. Fenvironment       - Fraction of individuals chosen randomly to increase environmental awareness [0,1]
-        action_high_bounds = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
-        action_low_bounds = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
-        self.action_space = spaces.Box(action_low_bounds, action_high_bounds, dtype=np.float32)
+        self.action_variables = None
+        self.observation_space = None
+        self._config = None
+        self._load_config(env_yaml_config_path)
+        for key in ['observation', 'action']:
+            self._make_gym_spaces(key=key)
 
         # setting an event loop for the parallel processes
         self.gama_server_event_loop = asyncio.new_event_loop()
@@ -127,6 +116,7 @@ class GamaEnv(gym.Env):
             print("model received reward:", policy_reward, " as a float: ", reward)
             self.state, end = self.read_observations()
             print("observations received", self.state, end)
+            # If it was the final step, we need to send a message back to the simulation once everything done to acknowledge that it can now close
             # If it was the final step, we need to send a message back to the simulation once everything done to acknowledge that it can now close
             if end:
                 self.gama_simulation_as_file.write("END\n")
@@ -265,17 +255,51 @@ class GamaEnv(gym.Env):
     def action_to_string(cls, actions: npt.NDArray[np.float64]) -> str:
         return ",".join([str(action) for action in actions]) + "\n"
 
+
+    def _load_config(self, env_yaml_config_path: str):
+        with open(env_yaml_config_path, 'r') as file:
+            self._config = yaml.safe_load(file)
+        self.observation_variables = self._config['observation']
+        self.action_variables = self._config['action']
+        # self.context_variables = setting_dict[setting]['context']
+        # if self.experiment_number is None:
+          #  self.experiment_number = setting_dict[setting]['experiment_number']
+
     def _make_gym_spaces(self, key):
+        key_spaces = {}
         if key == 'action':
             key_variables = self.action_variables
-        key_config = 'action'
-        key_data = self._config[key_config]
+        elif key == 'observation':
+            key_variables = self.observation_variables
+        else:
+            raise ValueError('"key" parameter must be in ["observation", "action"]')
+
+        if not key_variables:
+            return {}
+
+        key_data = self._config[key]
 
         for key_variable in key_variables:
             key_variable_dic = key_data[key_variable]
             if 'type' not in [*key_variable_dic]:
                 raise ValueError(f'"type" must be specified for {key} variable "{key_variable}"')
             type_ = key_variable_dic['type']
+            if type_ == 'float' or type_ == 'int':
+                if ('high' not in [*key_variable_dic]) or ('low' not in [*key_variable_dic]):
+                    raise ValueError(f'"high" and "low" must be specified for {key} variable "{key_variable}"')
+                low = key_variable_dic['low']
+                high = key_variable_dic['high']
+            if type_ == 'float':
+                space = spaces.Box(low=low, high=high, shape=())
+            elif type_ == 'discrete':
+                if 'size' not in [*key_variable_dic]:
+                    raise ValueError(f'"size" must be specified for {key} variable "{key_variable}"')
+                size = key_variable_dic['size']
+                space = spaces.Discrete(size)
+            elif type_ == 'int':
+                size = high - low + 1
+                space = spaces.Discrete(size)
+
             if type_ == 'array':
                 if 'subtype' not in [*key_variable_dic]:
                     raise ValueError(f'"subtype" must be specified for {key} variable "{key_variable}"')
@@ -288,7 +312,7 @@ class GamaEnv(gym.Env):
                         raise ValueError(f'"high" and "low" must be specified for {key} variable "{key_variable}"')
                     low = key_variable_dic['low']
                     high = key_variable_dic['high']
-                    # space = spaces.Box(low=low, high=high, shape=(size,))
+                    space = spaces.Box(low=low, high=high, shape=(size,))
                 elif subtype == 'discrete':
                     atomic_spaces = []
                     if 'subsize' not in [*key_variable_dic]:
@@ -296,7 +320,7 @@ class GamaEnv(gym.Env):
                     sub_size = key_variable_dic['subsize']
                     for element in range(size):
                         atomic_spaces.append(spaces.Discrete(sub_size))
-                    # space = spaces.Tuple(atomic_spaces)
+                    space = spaces.Tuple(atomic_spaces)
                 elif subtype == 'int':
                     if ('high' not in [*key_variable_dic]) or ('low' not in [*key_variable_dic]):
                         raise ValueError(f'"high" and "low" must be specified for {key} variable "{key_variable}"')
@@ -306,6 +330,12 @@ class GamaEnv(gym.Env):
                     sub_size = high - low + 1
                     for element in range(size):
                         atomic_spaces.append(spaces.Discrete(sub_size))
-                    # space = spaces.Tuple(atomic_spaces)
+                    space = spaces.Tuple(atomic_spaces)
                 else:
                     raise ValueError(f'{key} variable {key_variable} subtype {subtype} not in {["float", "int", "discrete"]}')
+
+            key_spaces[key_variable] = space
+            if key == 'observation':
+                self.observation_space = spaces.Dict(key_spaces)
+            else:
+                self.action_space = spaces.Dict(key_spaces)

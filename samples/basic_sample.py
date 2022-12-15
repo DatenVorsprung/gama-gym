@@ -12,6 +12,7 @@ try:
              headless_directory      = lv.headless_dir,
              headless_script_path    = lv.run_headless_script_path,    
              gaml_experiment_path    = CURRENT_DIRECTORY+r"/TCP_model_env_rc2.gaml",
+             env_yaml_config_path    = CURRENT_DIRECTORY+r"/env_config.yml",
              gaml_experiment_name    = "one_simulation",
              gama_server_url         = "localhost",
              gama_server_port        = 6868)
