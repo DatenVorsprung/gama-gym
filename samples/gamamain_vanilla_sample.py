@@ -5,7 +5,7 @@ import gym
 import user_local_variables as lv
 import gama_gym 
 import numpy as np
-import tensorflow as tf
+#import tensorflow as tf
 parser = argparse.ArgumentParser(description='Runs the experiment for the gama policy design environment')
 parser.add_argument(
     "--num-iters",
@@ -156,6 +156,7 @@ if __name__ == "__main__":
                 headless_directory      = lv.headless_dir,
                 headless_script_path    = lv.run_headless_script_path,
                 gaml_experiment_path    = CURRENT_DIRECTORY+r"/TCP_model_env_rc2.gaml",
+                env_yaml_config_path    = CURRENT_DIRECTORY+r"/env_config.yml",
                 gaml_experiment_name    = "one_simulation",
                 gama_server_url         = "localhost",
                 gama_server_port        = 6868)

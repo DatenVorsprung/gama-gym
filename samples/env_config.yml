@@ -37,9 +37,9 @@ observation:
       high: 1
       info: Current fraction of adopters
    remaining_decision_steps:
-      type: int
+      type: float
       low: 0
-      high: 10
+      high: 1000000000000
       info: Remaining decision steps in the time horizon
 setting:
   action:
