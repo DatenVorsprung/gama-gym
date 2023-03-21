@@ -2,5 +2,6 @@ from setuptools import setup
 
 setup(name='GamaEnv',
       version='0.0.1',
-      install_requires=['gym']
-) 
+      install_requires=['gym'],
+      py_modules=[]
+      )

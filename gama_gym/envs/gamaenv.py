@@ -1,5 +1,7 @@
 import asyncio
 import subprocess
+from asyncio import Future
+
 import gym
 import time
 import sys
@@ -7,18 +9,25 @@ import socket
 from _thread import start_new_thread
 import numpy as np
 import numpy.typing as npt
-from typing import Optional
+from typing import Optional, Dict
+
+from gama_client.command_types import CommandTypes
 from gym import spaces
 import psutil
-from gama_client.client import GamaClient
+from gama_client.base_client import GamaBaseClient
 import yaml
+
+import nest_asyncio
+
+nest_asyncio.apply()
+
 
 class GamaEnv(gym.Env):
     # USER LOCAL VARIABLES
-    headless_dir: str               # Root directory for gama headless
-    run_headless_script_path: str   # Path to the script that runs gama headless
-    gaml_file_path: str             # Path to the gaml file containing the experiment/simulation to run
-    experiment_name: str            # Name of the experiment to run
+    headless_dir: str  # Root directory for gama headless
+    run_headless_script_path: str  # Path to the script that runs gama headless
+    gaml_file_path: str  # Path to the gaml file containing the experiment/simulation to run
+    experiment_name: str  # Name of the experiment to run
 
     # ENVIRONMENT CONSTANTS
     max_episode_steps: int = 11
@@ -26,7 +35,7 @@ class GamaEnv(gym.Env):
     # Gama-server control variables
     gama_server_url: str = ""
     gama_server_port: int = -1
-    gama_server_handler: GamaClient = None
+    gama_server_handler: GamaBaseClient = None
     gama_server_sock_id: str = ""  # represents the current socket used to communicate with gama-server
     gama_server_exp_id: str = ""  # represents the current experiment being manipulated by gama-server
     gama_server_connected: asyncio.Event = None
@@ -37,6 +46,14 @@ class GamaEnv(gym.Env):
     gama_socket = None
     gama_simulation_as_file = None  # For some reason the typing doesn't work
     gama_simulation_connection = None  # Resulting from socket create connection
+
+    # Futures for gama client events
+    experiment_future: Future
+    play_future: Future
+    pause_future: Future
+    expression_future: Future
+    step_future: Future
+    stop_future: Future
 
     def __init__(self, headless_directory: str, headless_script_path: str,
                  gaml_experiment_path: str, gaml_experiment_name: str,
@@ -57,13 +74,29 @@ class GamaEnv(gym.Env):
             self._make_gym_spaces(key=key)
 
         # setting an event loop for the parallel processes
-        self.gama_server_event_loop = asyncio.new_event_loop()
+        self.gama_server_event_loop = asyncio.get_running_loop()
         asyncio.set_event_loop(self.gama_server_event_loop)
         self.gama_server_connected = asyncio.Event()
 
         self.init_gama_server()
 
         print("END INIT")
+
+    async def message_handler(self, message: Dict):
+        print("received", message)
+        if "command" in message:
+            if message["command"]["type"] == CommandTypes.Load.value:
+                self.experiment_future.set_result(message)
+            elif message["command"]["type"] == CommandTypes.Play.value:
+                self.play_future.set_result(message)
+            elif message["command"]["type"] == CommandTypes.Pause.value:
+                self.pause_future.set_result(message)
+            elif message["command"]["type"] == CommandTypes.Expression.value:
+                self.expression_future.set_result(message)
+            elif message["command"]["type"] == CommandTypes.Step.value:
+                self.step_future.set_result(message)
+            elif message["command"]["type"] == CommandTypes.Stop.value:
+                self.stop_future.set_result(message)
 
     def run_gama_server(self):
         cmd = f"cd \"{self.headless_dir}\" && \"{self.run_headless_script_path}\" -socket {self.gama_server_port}"
@@ -78,19 +111,21 @@ class GamaEnv(gym.Env):
         start_new_thread(self.run_gama_server, ())
 
         # try to connect to gama-server
-        self.gama_server_handler = GamaClient(self.gama_server_url, self.gama_server_port)
+        self.gama_server_handler = GamaBaseClient(self.gama_server_url, self.gama_server_port, self.message_handler)
         self.gama_server_sock_id = ""
         for i in range(30):
             try:
                 self.gama_server_event_loop.run_until_complete(asyncio.sleep(2))
                 print("try to connect")
-                self.gama_server_sock_id = self.gama_server_event_loop.run_until_complete(
+                self.gama_server_event_loop.run_until_complete(
                     self.gama_server_handler.connect())
-                if self.gama_server_sock_id != "":
+                if self.gama_server_handler.socket_id != "":
+                    self.gama_server_sock_id = self.gama_server_handler.socket_id
                     print("connection successful", self.gama_server_sock_id)
                     break
-            except Exception:
+            except Exception as e:
                 print("Connection failed")
+                print(e)
 
         if self.gama_server_sock_id == "":
             print("unable to connect to gama server")
@@ -117,7 +152,6 @@ class GamaEnv(gym.Env):
             self.state, end = self.read_observations()
             print("observations received", self.state, end)
             # If it was the final step, we need to send a message back to the simulation once everything done to acknowledge that it can now close
-            # If it was the final step, we need to send a message back to the simulation once everything done to acknowledge that it can now close
             if end:
                 self.gama_simulation_as_file.write("END\n")
                 self.gama_simulation_as_file.flush()
@@ -137,7 +171,7 @@ class GamaEnv(gym.Env):
 
     # Must reset the simulation to its initial state
     # Should return the initial observations
-    def reset(self, *, seed: Optional[int] = None, return_info: bool = False, options: Optional[dict] = None):
+    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         print("RESET")
         print("self.gama_simulation_as_file", self.gama_simulation_as_file)
         print("self.gama_simulation_connection",
@@ -163,14 +197,12 @@ class GamaEnv(gym.Env):
         self.wait_for_gama_to_connect()
 
         self.state, end = self.read_observations()
-        print('\t', 'setting up gama', time.time()-tic_setting_gama)
+        print('\t', 'setting up gama', time.time() - tic_setting_gama)
         print('after reset self.state', self.state)
         print('after reset end', end)
         print("END RESET")
-        if not return_info:
-            return np.array(self.state, dtype=np.float32)
-        else:
-            return np.array(self.state, dtype=np.float32), {}
+
+        return {'state': np.array(self.state, dtype=np.float32)}, {}
 
     def clean_subprocesses(self):
         if self.gama_server_pid > 0:
@@ -194,7 +226,11 @@ class GamaEnv(gym.Env):
         # initialize the experiment
         try:
             print("asking gama-server to start the experiment")
-            self.gama_server_exp_id = await self.gama_server_handler.init_experiment(self.gaml_file_path, self.experiment_name, params=[{"type": "int", "name": "port", "value": sim_port}])
+            self.experiment_future = asyncio.get_running_loop().create_future()
+            await self.gama_server_handler.load(self.gaml_file_path, self.experiment_name,
+                                                parameters=[{"type": "int", "name": "port", "value": sim_port}])
+            gama_result = await self.experiment_future
+            self.gama_server_exp_id = gama_result["content"]
         except Exception as e:
             print("Unable to init the experiment: ", self.gaml_file_path, self.experiment_name, e)
             sys.exit(-1)
@@ -203,9 +239,14 @@ class GamaEnv(gym.Env):
             print("Unable to compile or initialize the experiment")
             sys.exit(-1)
 
-        if not await self.gama_server_handler.play(self.gama_server_exp_id):
+        print("asking gama-server to play")
+        self.play_future = asyncio.get_running_loop().create_future()
+        await self.gama_server_handler.play(self.gama_server_exp_id, socket_id=self.gama_server_sock_id)
+        play_result = await self.play_future
+        if not play_result['type'] == 'CommandExecutedSuccessfully':
             print("Unable to run the experiment")
             sys.exit(-1)
+        print("experiment started")
 
     # Initialize the socket to communicate with gama
     def init_server_simulation_control(self) -> int:
@@ -231,7 +272,6 @@ class GamaEnv(gym.Env):
         self.gama_simulation_as_file = self.gama_simulation_connection.makefile(mode='rw')
 
     def read_observations(self):
-
         received_observations: str = self.gama_simulation_as_file.readline()
         print("model received:", received_observations)
 
@@ -255,7 +295,6 @@ class GamaEnv(gym.Env):
     def action_to_string(cls, actions: npt.NDArray[np.float64]) -> str:
         return ",".join([str(action) for action in actions]) + "\n"
 
-
     def _load_config(self, env_yaml_config_path: str):
         with open(env_yaml_config_path, 'r') as file:
             self._config = yaml.safe_load(file)
@@ -263,7 +302,7 @@ class GamaEnv(gym.Env):
         self.action_variables = self._config['action']
         # self.context_variables = setting_dict[setting]['context']
         # if self.experiment_number is None:
-          #  self.experiment_number = setting_dict[setting]['experiment_number']
+        #  self.experiment_number = setting_dict[setting]['experiment_number']
 
     def _make_gym_spaces(self, key):
         key_spaces = {}
@@ -332,7 +371,8 @@ class GamaEnv(gym.Env):
                         atomic_spaces.append(spaces.Discrete(sub_size))
                     space = spaces.Tuple(atomic_spaces)
                 else:
-                    raise ValueError(f'{key} variable {key_variable} subtype {subtype} not in {["float", "int", "discrete"]}')
+                    raise ValueError(
+                        f'{key} variable {key_variable} subtype {subtype} not in {["float", "int", "discrete"]}')
 
             key_spaces[key_variable] = space
             if key == 'observation':
