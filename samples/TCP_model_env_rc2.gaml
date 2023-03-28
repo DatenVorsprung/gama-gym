@@ -31,7 +31,7 @@ global {
 			//write "simulation waiting for python's end signal";
 			
 			//when the python model is over he sends a message to the simulation, needed to prevent connection reset exceptions
-//			do read_line from:server;
+            //do read_line from:server;
 			loop while: !has_more_message()  { 
 				do fetch_message_from_network;
 			}
@@ -76,13 +76,13 @@ species institution_tcp parent: institution skills:[network] {
 		let observations <- "(" + budget + "," + adoption_rate + "," + num_policy_selected + ")" ;
 		do send to:"localhost:" + port contents:observations+"END\n";
 		
-//		let sent 	<- send(server, observations+"END\n");
-//		if (! sent) {
-//			write "impossible d'envoyer le message de fin de simulation à : " + server;
-//			ask world{
-//				do game_over;				
-//			}
-//		}
+        //		let sent 	<- send(server, observations+"END\n");
+        //		if (! sent) {
+        //			write "impossible d'envoyer le message de fin de simulation à : " + server;
+        //			ask world{
+        //				do game_over;
+        //			}
+        //		}
 	}	
 
 	action send_reward {
@@ -91,13 +91,13 @@ species institution_tcp parent: institution skills:[network] {
 			//float reward 	<- previous_mean_intention != 0 ? (mean_intention - previous_mean_intention)/ previous_mean_intention : mean_intention ;
 			let reward 	<- (adopters_nb - previous_adopters_nb)/number_farmers;
 			do send to:"localhost:" + port contents:string(reward) + "\n";
-//			bool sent 	<- send(server, string(reward) + "\n");
-//			if (! sent) {
-//				write "impossible d'envoyer le reward " + reward + " à : " + server;
-//				ask world{
-//					do game_over;				
-//				}
-//			}
+            //			bool sent 	<- send(server, string(reward) + "\n");
+            //			if (! sent) {
+            //				write "impossible d'envoyer le reward " + reward + " à : " + server;
+            //				ask world{
+            //					do game_over;
+            //				}
+            //			}
 		}
 		else {
 			at_least_one_policy <- true;
@@ -113,18 +113,17 @@ species institution_tcp parent: institution skills:[network] {
 		//budget restant, nb d'adoptant/taux, ntimesselectedpolicy
 		let observations <- "(" + budget + "," + adoption_rate + "," + num_policy_selected + ")" ;
 		do send to:"localhost:"+port contents:observations + "\n";
-		//let sent <-  send(server, observations);
-		//if(!sent) {
-//			write "Impossible d'envoyer les observations "+ observations + " au serveur " + server;
-//			ask world{
-//				do game_over;		
-//			}
+		// let sent <-  send(server, observations);
+		// if(!sent) {
+        // write "Impossible d'envoyer les observations "+ observations + " au serveur " + server;
+        // ask world{
+        //	do game_over;
+        //}
 		//}
 		
 		
 	}
-	
-	
+
 	message wait_next_message {
 		write "waiting for python to send data"; 
 		loop while: !has_more_message()  { 
@@ -150,8 +149,7 @@ species institution_tcp parent: institution skills:[network] {
 			let envr_p		<- float(actions[4]);
 
 			//write actions_msg + " : " + fin_support + " " + training_l +","+training_p + " " + envr_l + "," + envr_p;
-			
-			
+
 			do financial_support(fin_support);
 			do training(training_l, training_p);
 			do environmental_sensibilisation(envr_l, envr_p);
@@ -162,11 +160,7 @@ species institution_tcp parent: institution skills:[network] {
 				do game_over;				
 			}
 		}
-		
-		
-		
 	}
-	
 } 
 
 

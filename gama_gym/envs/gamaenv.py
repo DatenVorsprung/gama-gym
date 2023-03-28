@@ -55,6 +55,8 @@ class GamaEnv(gym.Env):
     step_future: Future
     stop_future: Future
 
+    state: dict
+
     def __init__(self, headless_directory: str, headless_script_path: str,
                  gaml_experiment_path: str, gaml_experiment_name: str,
                  gama_server_url: str, env_yaml_config_path: str, gama_server_port: int):
@@ -117,8 +119,7 @@ class GamaEnv(gym.Env):
             try:
                 self.gama_server_event_loop.run_until_complete(asyncio.sleep(2))
                 print("try to connect")
-                self.gama_server_event_loop.run_until_complete(
-                    self.gama_server_handler.connect())
+                self.gama_server_event_loop.run_until_complete(self.gama_server_handler.connect())
                 if self.gama_server_handler.socket_id != "":
                     self.gama_server_sock_id = self.gama_server_handler.socket_id
                     print("connection successful", self.gama_server_sock_id)
@@ -176,8 +177,7 @@ class GamaEnv(gym.Env):
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         print("RESET")
         print("self.gama_simulation_as_file", self.gama_simulation_as_file)
-        print("self.gama_simulation_connection",
-              self.gama_simulation_connection)
+        print("self.gama_simulation_connection", self.gama_simulation_connection)
         super().reset(seed=seed, options=options)
         # Check if the environment terminated
         if self.gama_simulation_connection is not None:

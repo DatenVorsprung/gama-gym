@@ -84,7 +84,6 @@ global {
 	}
 	
 	/*  ******* ACTIONS **********/
-
 	
 	action update_outputs(list<farmer> farmers) {
 		adoption_rate <- (farmers count each.adoption) /length(farmers);
@@ -96,7 +95,6 @@ global {
 		if mode_batch and save_every_step {
 			save "" + int(self) + "," + seed + "," + cycle + ","+ financial_help_level+  ","+ training_level +","+ training_proportion+ ","+ sensibilisation_level+ ","+ sensibilisation_proportion + "," +adoption_rate + "," + mean_intention type: text rewrite: false to: name_file_save; 
 		}
-		
 	}
 	
 	action create_farmers {
@@ -137,10 +135,8 @@ global {
 		}	
 		end_simulation <- true;
 		do simulation_ending;
-		
 	}
 }
-
 
 species farmer schedules: shuffle(farmer) {
 	float w_attitude ;
@@ -166,10 +162,8 @@ species farmer schedules: shuffle(farmer) {
 		opinion_on_topics <- copy(opinion_on_topics_init);
 		adoption <- false;
 		technical_skill <- technical_skill_init;
-		
 	}
-	
-	
+
 	action exchange_with_other {
 		if flip(proba_interaction_day) {
 			string topic <- one_of(opinion_on_topics.keys);
@@ -187,7 +181,7 @@ species farmer schedules: shuffle(farmer) {
 			}
 		}
 	}
-	
+
 	action compute_attitude {
 		attitude <- 0.0;
 		map<string, float> supp <- the_institution.support;
@@ -202,13 +196,14 @@ species farmer schedules: shuffle(farmer) {
 	action compute_pbc {
 		pbc <-  technical_skill;
 	}
+
 	action compute_intention {
 		do compute_attitude;
 		do compute_social_norm;
 		do compute_pbc;
 		intention <- attitude * w_attitude + social_norm * w_social + pbc * w_pbc;
-		
 	}
+
 	action decision {
 		if not adoption and (intention > adoption_threshold) {
 			adoption <- true;
@@ -237,8 +232,9 @@ species institution {
 	
 	action other_things_init {
 	}
+
 	action initialize {
-	       // write "initialize";
+	    // write "initialize";
 		support <- [];
 		budget <- 0.0;
 		previous_adopters_nb <- 0;
@@ -247,8 +243,8 @@ species institution {
 		num_policy_selected <- 0;
 		do other_things_init;
 		//write "END initialize";
-		
 	}
+
 	action thing_before_policy_selecting;
 	
 	action select_policy {
@@ -271,10 +267,8 @@ species institution {
 		if sensibilisation_level > 0 and sensibilisation_proportion > 0  {
 			do environmental_sensibilisation(sensibilisation_level, sensibilisation_proportion);
 		}
-	
-		
-		
 	}
+
 	action add_money {
 		budget <- budget + new_budget_year;
 	}
