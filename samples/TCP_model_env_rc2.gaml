@@ -71,7 +71,7 @@ species institution_tcp parent: institution skills:[network] {
 	}
 
 	action send_end {
-	        //budget restant, nb d'adoptant/taux, temps restant
+	    //budget restant, nb d'adoptant/taux, temps restant
 		//let observations <- "(" + budget + "," + adoption_rate + "," + (end_simulation_after - time) + ")" ;
 		let observations <- "(" + budget + "," + adoption_rate + "," + num_policy_selected + ")" ;
 		do send to:"localhost:" + port contents:observations+"END\n";

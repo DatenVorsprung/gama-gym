@@ -137,8 +137,9 @@ class GamaEnv(gym.Env):
         try:
             print("STEP")
             # sending actions
-            str_action = GamaEnv.action_to_string(np.array(action)) + "\n"
-            print("model sending policy:(thetaeconomy,thetamanagement,fmanagement,thetaenvironment,fenvironment)", str_action)
+            str_action = GamaEnv.action_to_string(action) + "\n"
+            print("model sending policy:(thetaeconomy,thetamanagement,fmanagement,thetaenvironment,fenvironment)",
+                  str_action)
             print(self.gama_simulation_connection)
 
             self.gama_simulation_as_file.write(str_action)
@@ -167,7 +168,8 @@ class GamaEnv(gym.Env):
             print(sys.exc_info()[0])
             sys.exit(-1)
         print("END STEP")
-        return np.array(self.state, dtype=np.float32), reward, end, {}
+        truncated = False
+        return self.state, reward, end, truncated, {}
 
     # Must reset the simulation to its initial state
     # Should return the initial observations
@@ -176,6 +178,7 @@ class GamaEnv(gym.Env):
         print("self.gama_simulation_as_file", self.gama_simulation_as_file)
         print("self.gama_simulation_connection",
               self.gama_simulation_connection)
+        super().reset(seed=seed, options=options)
         # Check if the environment terminated
         if self.gama_simulation_connection is not None:
             print("self.gama_simulation_connection.fileno()",
@@ -201,8 +204,7 @@ class GamaEnv(gym.Env):
         print('after reset self.state', self.state)
         print('after reset end', end)
         print("END RESET")
-
-        return {'state': np.array(self.state, dtype=np.float32)}, {}
+        return self.state, {}
 
     def clean_subprocesses(self):
         if self.gama_server_pid > 0:
@@ -278,7 +280,7 @@ class GamaEnv(gym.Env):
         over = "END" in received_observations
         obs = GamaEnv.string_to_nparray(received_observations.replace("END", ""))
         # obs[2]  = float(self.n_times_4_action - self.i_experience)  # We change the last observation to be the number of times that remain for changing the policy
-
+        obs = {k: v for k, v in zip(self.observation_variables, obs)}
         return obs, over
 
     # Converts a string to a numpy array of floats
@@ -293,7 +295,7 @@ class GamaEnv(gym.Env):
     # Converts an action to a string to be sent to the simulation
     @classmethod
     def action_to_string(cls, actions: npt.NDArray[np.float64]) -> str:
-        return ",".join([str(action) for action in actions]) + "\n"
+        return ",".join([k + ":" + str(v) for k, v in actions.items()]) + "\n"
 
     def _load_config(self, env_yaml_config_path: str):
         with open(env_yaml_config_path, 'r') as file:

@@ -22,6 +22,7 @@ async def main():
                        gama_server_port=6868)
         # Use the gym checker to perform a sanity check to make sure that it conforms to the API
         check_env(env)
+        print("Check successful!")
     finally:
         if env is not None:
             env.close()
