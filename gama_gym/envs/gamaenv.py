@@ -9,7 +9,7 @@ import socket
 from _thread import start_new_thread
 import numpy as np
 import numpy.typing as npt
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from gama_client.command_types import CommandTypes
 from gym import spaces
@@ -59,7 +59,8 @@ class GamaEnv(gym.Env):
 
     def __init__(self, headless_directory: str, headless_script_path: str,
                  gaml_experiment_path: str, gaml_experiment_name: str,
-                 gama_server_url: str, env_yaml_config_path: str, gama_server_port: int):
+                 gama_server_url: str, env_yaml_config_path: str, gama_server_port: int,
+                 gama_experiment_params: Optional[List[Dict]] = None):
 
         self.headless_dir = headless_directory
         self.run_headless_script_path = headless_script_path
@@ -67,6 +68,7 @@ class GamaEnv(gym.Env):
         self.experiment_name = gaml_experiment_name
         self.gama_server_url = gama_server_url
         self.gama_server_port = gama_server_port
+        self.experiment_params = gama_experiment_params or []
 
         self.action_variables = None
         self.observation_space = None
@@ -99,9 +101,11 @@ class GamaEnv(gym.Env):
                 self.step_future.set_result(message)
             elif message["command"]["type"] == CommandTypes.Stop.value:
                 self.stop_future.set_result(message)
+            else:
+                raise Exception("Unknown command type")
 
     def run_gama_server(self):
-        cmd = f"cd \"{self.headless_dir}\" && \"{self.run_headless_script_path}\" -socket {self.gama_server_port}"
+        cmd = f"cd \"{self.headless_dir}\" && \"{self.run_headless_script_path}\" -v -socket {self.gama_server_port}"
         print("running gama headless with command: ", cmd)
         server = subprocess.Popen(cmd, shell=True)
         self.gama_server_pid = server.pid
@@ -139,13 +143,12 @@ class GamaEnv(gym.Env):
             print("STEP")
             # sending actions
             str_action = GamaEnv.action_to_string(action) + "\n"
-            print("model sending policy:(thetaeconomy,thetamanagement,fmanagement,thetaenvironment,fenvironment)",
-                  str_action)
+            print("model sending action:", str_action)
             print(self.gama_simulation_connection)
 
             self.gama_simulation_as_file.write(str_action)
             self.gama_simulation_as_file.flush()
-            print("model sent policy, now waiting for reward")
+            print("model sent action, now waiting for reward")
             # we wait for the reward
             policy_reward = self.gama_simulation_as_file.readline()
             reward = float(policy_reward)
@@ -230,9 +233,12 @@ class GamaEnv(gym.Env):
             print("asking gama-server to start the experiment")
             self.experiment_future = asyncio.get_running_loop().create_future()
             await self.gama_server_handler.load(self.gaml_file_path, self.experiment_name,
-                                                parameters=[{"type": "int", "name": "port", "value": sim_port}])
+                                                True, True, True,
+                                                parameters=[{"type": "int", "name": "port",
+                                                             "value": sim_port}] + self.experiment_params)
             gama_result = await self.experiment_future
             self.gama_server_exp_id = gama_result["content"]
+
         except Exception as e:
             print("Unable to init the experiment: ", self.gaml_file_path, self.experiment_name, e)
             sys.exit(-1)

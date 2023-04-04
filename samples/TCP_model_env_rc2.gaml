@@ -72,7 +72,6 @@ species institution_tcp parent: institution skills:[network] {
 
 	action send_end {
 	    //budget restant, nb d'adoptant/taux, temps restant
-		//let observations <- "(" + budget + "," + adoption_rate + "," + (end_simulation_after - time) + ")" ;
 		let observations <- "(" + budget + "," + adoption_rate + "," + num_policy_selected + ")" ;
 		do send to:"localhost:" + port contents:observations+"END\n";
 		
@@ -87,8 +86,6 @@ species institution_tcp parent: institution skills:[network] {
 
 	action send_reward {
 		if(at_least_one_policy) {
-			//The reward = increment on percentage of new adopters
-			//float reward 	<- previous_mean_intention != 0 ? (mean_intention - previous_mean_intention)/ previous_mean_intention : mean_intention ;
 			let reward 	<- (adopters_nb - previous_adopters_nb)/number_farmers;
 			do send to:"localhost:" + port contents:string(reward) + "\n";
             //			bool sent 	<- send(server, string(reward) + "\n");
