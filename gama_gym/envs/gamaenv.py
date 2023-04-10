@@ -1,3 +1,4 @@
+from ast import literal_eval
 import asyncio
 import subprocess
 from asyncio import Future
@@ -168,7 +169,7 @@ class GamaEnv(gym.Env):
         except ConnectionResetError:
             print("connection reset, end of simulation")
         except Exception:
-            print("EXCEPTION pendant l'execution")
+            print("EXCEPTION during execution")
             print(sys.exc_info()[0])
             sys.exit(-1)
         print("END STEP")
@@ -218,6 +219,9 @@ class GamaEnv(gym.Env):
 
     def __del__(self):
         self.clean_subprocesses()
+
+    async def close(self):
+        await self.gama_server_handler.exit()
 
     # Init the server + run gama
     async def run_gama_simulation(self):
@@ -284,9 +288,8 @@ class GamaEnv(gym.Env):
         print("model received:", received_observations)
 
         over = "END" in received_observations
-        obs = GamaEnv.string_to_nparray(received_observations.replace("END", ""))
+        obs = literal_eval(received_observations.replace("END", ""))
         # obs[2]  = float(self.n_times_4_action - self.i_experience)  # We change the last observation to be the number of times that remain for changing the policy
-        obs = {k: v for k, v in zip(self.observation_variables, obs)}
         return obs, over
 
     # Converts a string to a numpy array of floats
@@ -295,7 +298,10 @@ class GamaEnv(gym.Env):
         # first we remove brackets and parentheses
         clean = "".join([c if c not in "()[]{}" else '' for c in str(array_as_string)])
         # then we split into numbers
-        nbs = [float(nb) for nb in filter(lambda s: s.strip() != "", clean.split(','))]
+        try:
+            nbs = [float(nb) for nb in filter(lambda s: s.strip() != "", clean.split(','))]
+        except ValueError:
+            nbs = [nb for nb in filter(lambda s: s.strip() != "", clean.split(','))]
         return np.array(nbs)
 
     # Converts an action to a string to be sent to the simulation
