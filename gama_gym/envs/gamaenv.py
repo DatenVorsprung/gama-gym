@@ -1,5 +1,6 @@
 from ast import literal_eval
 import asyncio
+import json
 import subprocess
 from asyncio import Future
 
@@ -143,7 +144,7 @@ class GamaEnv(gym.Env):
         try:
             print("STEP")
             # sending actions
-            str_action = GamaEnv.action_to_string(action) + "\n"
+            str_action = json.dumps(action) + "\n"
             print("model sending action:", str_action)
             print(self.gama_simulation_connection)
 
@@ -260,14 +261,18 @@ class GamaEnv(gym.Env):
             sys.exit(-1)
         print("experiment started")
 
-    # Initialize the socket to communicate with gama
     def init_server_simulation_control(self) -> int:
+        """Initialize the socket to communicate with gama
+
+        Returns:
+            int: _description_
+        """
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         print("Socket successfully created")
 
         s.bind(('', 0))  # localhost + port given by the os
         port = s.getsockname()[1]
-        print("Socket bound to %s" % port)
+        print(f"Socket bound to {port}")
 
         s.listen()
         print("Socket started listening")
@@ -275,39 +280,26 @@ class GamaEnv(gym.Env):
         self.gama_socket = s
         return port
 
-    # Connect with the current running gama simulation
     def wait_for_gama_to_connect(self):
-
+        """Connect with the current running gama simulation
+        """
         # The server is waiting for clients to connect
         self.gama_simulation_connection, addr = self.gama_socket.accept()
         print("gama connected:", self.gama_simulation_connection, addr)
         self.gama_simulation_as_file = self.gama_simulation_connection.makefile(mode='rw')
 
     def read_observations(self):
+        """Reads the observations from the simulation
+
+        Returns:
+            _type_: _description_
+        """
         received_observations: str = self.gama_simulation_as_file.readline()
         print("model received:", received_observations)
 
         over = "END" in received_observations
         obs = literal_eval(received_observations.replace("END", ""))
-        # obs[2]  = float(self.n_times_4_action - self.i_experience)  # We change the last observation to be the number of times that remain for changing the policy
         return obs, over
-
-    # Converts a string to a numpy array of floats
-    @classmethod
-    def string_to_nparray(cls, array_as_string: str) -> npt.NDArray[np.float64]:
-        # first we remove brackets and parentheses
-        clean = "".join([c if c not in "()[]{}" else '' for c in str(array_as_string)])
-        # then we split into numbers
-        try:
-            nbs = [float(nb) for nb in filter(lambda s: s.strip() != "", clean.split(','))]
-        except ValueError:
-            nbs = [nb for nb in filter(lambda s: s.strip() != "", clean.split(','))]
-        return np.array(nbs)
-
-    # Converts an action to a string to be sent to the simulation
-    @classmethod
-    def action_to_string(cls, actions: npt.NDArray[np.float64]) -> str:
-        return ",".join([k + ":" + str(v) for k, v in actions.items()]) + "\n"
 
     def _load_config(self, env_yaml_config_path: str):
         with open(env_yaml_config_path, 'r') as file:
@@ -342,15 +334,12 @@ class GamaEnv(gym.Env):
                     raise ValueError(f'"high" and "low" must be specified for {key} variable "{key_variable}"')
                 low = key_variable_dic['low']
                 high = key_variable_dic['high']
-            if type_ == 'float':
-                space = spaces.Box(low=low, high=high, shape=())
+                shape = literal_eval(key_variable_dic.get('shape', "()"))
+                space = spaces.Box(low=low, high=high, shape=shape, dtype=type_)
             elif type_ == 'discrete':
                 if 'size' not in [*key_variable_dic]:
                     raise ValueError(f'"size" must be specified for {key} variable "{key_variable}"')
                 size = key_variable_dic['size']
-                space = spaces.Discrete(size)
-            elif type_ == 'int':
-                size = high - low + 1
                 space = spaces.Discrete(size)
 
             if type_ == 'array':
