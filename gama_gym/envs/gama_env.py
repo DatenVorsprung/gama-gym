@@ -6,13 +6,13 @@ import socket
 import subprocess
 import sys
 import time
-from _thread import start_new_thread
 from ast import literal_eval
 from asyncio import Future
 from typing import Optional, Dict, List, SupportsFloat, Any
 
 import gymnasium
 import nest_asyncio
+import numpy as np
 import psutil
 import yaml
 from gama_client.base_client import GamaBaseClient
@@ -78,12 +78,9 @@ class GamaEnv(gymnasium.Env):
         for key in ['observation', 'action']:
             self._make_gym_spaces(key=key)
 
-        # setting an event loop for the parallel processes
-        self.gama_server_event_loop = asyncio.get_running_loop()
-        asyncio.set_event_loop(self.gama_server_event_loop)
-        self.gama_server_connected = asyncio.Event()
-
-        self.init_gama_server()
+        self._gama_process = self.run_gama_server()
+        self.client = GamaBaseClient(self.gama_server_url, self.gama_server_port)
+        asyncio.wait(self.client.connect)
 
         print("END INIT")
 
@@ -111,11 +108,11 @@ class GamaEnv(gymnasium.Env):
         server = subprocess.Popen(cmd, shell=True)
         self.gama_server_pid = server.pid
         print("gama server pid:", self.gama_server_pid)
+        return server
 
     def init_gama_server(self):
 
         # Run gama server from the filesystem
-        start_new_thread(self.run_gama_server, ())
 
         # try to connect to gama-server
         self.gama_server_handler = GamaBaseClient(self.gama_server_url, self.gama_server_port, self.message_handler)
@@ -382,3 +379,31 @@ class GamaEnv(gymnasium.Env):
                 self.observation_space = spaces.Dict(key_spaces)
             else:
                 self.action_space = spaces.Dict(key_spaces)
+
+
+async def main():
+    import os
+    CURRENT_DIRECTORY = os.path.abspath(os.getcwd())
+
+    env = GamaEnv(
+        headless_directory='/opt/gama-platform/headless',
+        headless_script_path='/opt/gama-platform/headless/gama-headless.sh',
+        gaml_experiment_path="/home/axel/Projects/gama-gym/samples/TCP_model_env_rc2.gaml",
+        env_yaml_config_path="/home/axel/Projects/gama-gym/samples/env_config.yml",
+        gaml_experiment_name="one_simulation",
+        gama_server_url="localhost",
+        gama_server_port=6868,
+    )  # Test that run 2 complete episodes with the same environment
+    n_iters = 2
+    for iter in range(n_iters):
+        initial_observation = env.reset()
+        print('initial_observation ', initial_observation)
+        done = False
+        while not done:
+            action = np.random.rand(1, 5).flatten()
+            next_observation, reward, done, term, info = env.step(action)
+            print('done ', done)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
