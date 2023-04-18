@@ -2,3 +2,4 @@ gymnasium
 gama_client==1.1.1
 psutil
 nest-asyncio
+pyyaml

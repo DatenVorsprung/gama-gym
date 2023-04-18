@@ -1,0 +1,123 @@
+from __future__ import annotations
+
+import json
+from websockets.sync import client
+
+import websockets
+
+
+class GamaClient:
+
+    def __init__(self, host: str, port: int):
+        self._conn: websockets.ClientConnection = client.connect(f'ws://{host}:{port}', close_timeout=1.0)
+        res = json.loads(self._conn.recv())
+        if res['type'] != 'ConnectionSuccessful':
+            raise ConnectionError('Connection failed: ' + res['type'] + ' ' + res['message'])
+
+
+    def load(self,
+             model: str,
+             experiment: str,
+             console: bool = False,
+             status: bool = False,
+             dialog: bool = False,
+             parameters: list[dict] = None,
+             until: str = ''):
+        command = {
+            'type': 'load',
+            'model': model,
+            'experiment': experiment,
+            'console': console,
+            'status': status,
+            'dialog': dialog,
+            'parameters': parameters or [],
+            'until': until
+        }
+        return self._send_command(command)
+
+    def exit(self):
+        command = {
+            'type': 'exit'
+        }
+        return self._send_command(command)
+
+    def play(self, exp_id: str, sync: bool = None):
+        command = {
+            'type': 'play',
+            'exp_id': exp_id,
+            'sync': sync
+        }
+        return self._send_command(command)
+
+    def pause(self, exp_id: str):
+        command = {
+            'type': 'pause',
+            'exp_id': exp_id
+        }
+        return self._send_command(command)
+
+    def step(self, exp_id: str, nb_step: int = 1, sync: bool = False):
+        command = {
+            'type': 'step',
+            'exp_id': exp_id,
+            'nb_step': nb_step,
+            'sync': sync
+        }
+        return self._send_command(command)
+
+    def step_back(self, exp_id: str, nb_step: int = 1, sync: bool = False):
+        command = {
+            'type': 'stepBack',
+            'exp_id': exp_id,
+            'nb_step': nb_step,
+            'sync': sync
+        }
+        return self._send_command(command)
+
+    def stop(self, exp_id: str):
+        command = {
+            'type': 'stop',
+            'exp_id': exp_id
+        }
+        return self._send_command(command)
+
+    def reload(self, exp_id: str, parameters: list[dict] = None, until: str = ""):
+        command = {
+            'type': 'reload',
+            'exp_id': exp_id,
+            'parameters': parameters or [],
+            'until': until
+        }
+        return self._send_command(command)
+
+    def expression(self, exp_id: str, expression: str):
+        command = {
+            'type': 'expression',
+            'exp_id': exp_id,
+            'expr': expression
+        }
+        return self._send_command(command)
+
+    def close(self):
+        self._conn.close()
+
+    def _send_command(self, command):
+        self._conn.send(json.dumps(command))
+        res = self._conn.recv()
+        return json.loads(res)['content']
+
+if __name__ == '__main__':
+    client = GamaClient(host='localhost', port=6868)
+    import os
+    model = '/gama-gym/samples/particles.gaml'
+    exp_id = client.load(model=model, experiment='particles_experiment')
+    print('Loaded experiment: ', exp_id)
+
+
+    response = client.step(exp_id=exp_id, sync=True)
+    response = client.expression(exp_id=exp_id, expression='nb_cells')
+    print('nb_cells: ', response)
+    response = client.expression(exp_id=exp_id, expression='agents[0].actionspace')
+    print('actspace: ', response)
+    #client.exit()
+    client.close()

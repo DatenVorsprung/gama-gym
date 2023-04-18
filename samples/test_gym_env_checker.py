@@ -3,7 +3,7 @@ import os
 
 import gymnasium
 from gymnasium.utils.env_checker import check_env
-
+from gama_gym.envs.gamaenv import GamaEnv
 import user_local_variables as lv
 
 CURRENT_DIRECTORY = os.path.abspath(os.getcwd())
