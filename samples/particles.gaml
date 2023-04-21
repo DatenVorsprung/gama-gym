@@ -11,9 +11,6 @@ global {
 		}
 	}
 
-	action step {
-	    write "step";
-	}
 }
 
 species cell skills: [moving3D] {

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import dataclasses
 import json
+from typing import Any
+
 from websockets.sync import client
 
 import websockets
@@ -8,11 +11,19 @@ import websockets
 
 class GamaClient:
 
+    @dataclasses.dataclass
+    class Parameter:
+        type: str
+        value: Any
+        name: str
+
     def __init__(self, host: str, port: int):
         self._conn: websockets.ClientConnection = client.connect(f'ws://{host}:{port}', close_timeout=1.0)
         res = json.loads(self._conn.recv())
         if res['type'] != 'ConnectionSuccessful':
-            raise ConnectionError('Connection failed: ' + res['type'] + ' ' + res['message'])
+            raise ConnectionError(f'Connection failed. {res["type"]}: {res["message"]}')
+        x = GamaClient.Parameter(type='str', name='h', value=2)
+        x.__dict__
 
 
     def load(self,
@@ -21,8 +32,9 @@ class GamaClient:
              console: bool = False,
              status: bool = False,
              dialog: bool = False,
-             parameters: list[dict] = None,
+             parameters: list[Parameter] = None,
              until: str = ''):
+        parameters = parameters or []
         command = {
             'type': 'load',
             'model': model,
@@ -30,7 +42,7 @@ class GamaClient:
             'console': console,
             'status': status,
             'dialog': dialog,
-            'parameters': parameters or [],
+            'parameters': [p.__dict__ for p in parameters],
             'until': until
         }
         return self._send_command(command)
@@ -81,11 +93,12 @@ class GamaClient:
         }
         return self._send_command(command)
 
-    def reload(self, exp_id: str, parameters: list[dict] = None, until: str = ""):
+    def reload(self, exp_id: str, parameters: list[Parameter] = None, until: str = ""):
+        parameters = parameters or []
         command = {
             'type': 'reload',
             'exp_id': exp_id,
-            'parameters': parameters or [],
+            'parameters': [p.__dict__ for p in parameters],
             'until': until
         }
         return self._send_command(command)
@@ -104,12 +117,15 @@ class GamaClient:
     def _send_command(self, command):
         self._conn.send(json.dumps(command))
         res = self._conn.recv()
-        return json.loads(res)['content']
+        res = json.loads(res)
+        if res['type'] == 'UnableToExecuteRequest':
+            raise ValueError(res['content'])
+        return res['content']
 
 if __name__ == '__main__':
     client = GamaClient(host='localhost', port=6868)
     import os
-    model = '/gama-gym/samples/particles.gaml'
+    model = '/home/axel/Projects/gama-gym/samples/particles.gaml'
     exp_id = client.load(model=model, experiment='particles_experiment')
     print('Loaded experiment: ', exp_id)
 
