@@ -1,12 +1,21 @@
 from __future__ import annotations
 
-from typing import SupportsFloat, Any
+from typing import SupportsFloat
 
 import gymnasium.spaces
 import numpy as np
 from gymnasium.core import ActType, ObsType
+
 from gama_gym.envs.gama_client import GamaClient
 from gama_gym.envs.gama_env import GamaEnv
+
+
+def obs_fn(exp_id: str, client: GamaClient) -> tuple[ObsType, dict]:
+    pass
+
+
+def step_fn(exp_id: str, client: GamaClient, action: ActType) -> tuple[ObsType, dict[str, SupportsFloat], bool, dict]:
+    pass
 
 
 class ParticleEnv(GamaEnv):

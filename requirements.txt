@@ -1,6 +1,5 @@
 gymnasium
-gama_client==1.1.1
 psutil
 nest-asyncio
 pyyaml
-websockets
+websockets>=10.0.0

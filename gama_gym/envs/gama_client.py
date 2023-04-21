@@ -4,9 +4,8 @@ import dataclasses
 import json
 from typing import Any
 
-from websockets.sync import client
-
 import websockets
+from websockets.sync import client
 
 
 class GamaClient:
@@ -22,8 +21,6 @@ class GamaClient:
         res = json.loads(self._conn.recv())
         if res['type'] != 'ConnectionSuccessful':
             raise ConnectionError(f'Connection failed. {res["type"]}: {res["message"]}')
-        x = GamaClient.Parameter(type='str', name='h', value=2)
-        x.__dict__
 
 
     def load(self,
@@ -124,16 +121,21 @@ class GamaClient:
 
 if __name__ == '__main__':
     client = GamaClient(host='localhost', port=6868)
-    import os
-    model = '/home/axel/Projects/gama-gym/samples/particles.gaml'
-    exp_id = client.load(model=model, experiment='particles_experiment')
+
+    model = '/TouristFlow/TouristFlow.gaml'
+    exp_id = client.load(model=model, experiment='Salzburghotelsmuseums')
     print('Loaded experiment: ', exp_id)
+    res = client.expression(exp_id, 'length(species(people).population)')
+    while int(res) == 0:
+        client.step(exp_id=exp_id, sync=True)
+        res = client.expression(exp_id, 'length(species(people).population)')
 
-
+    obs = client.expression(exp_id=exp_id, expression='do get_observation;')
     response = client.step(exp_id=exp_id, sync=True)
+    obs = client.expression(exp_id=exp_id, expression='do get_observation;')
     response = client.expression(exp_id=exp_id, expression='nb_cells')
     print('nb_cells: ', response)
     response = client.expression(exp_id=exp_id, expression='agents[0].actionspace')
     print('actspace: ', response)
-    #client.exit()
+    # client.exit()
     client.close()
