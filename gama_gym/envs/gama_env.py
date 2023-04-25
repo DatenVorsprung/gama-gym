@@ -8,24 +8,20 @@ from gymnasium.core import RenderFrame, ObsType, ActType
 
 from gama_gym.envs.gama_client import GamaClient
 
-ObservationFn = Callable[[str, GamaClient], tuple[ObsType, dict]]
-StepFn = Callable[[ObsType, ActType, dict], tuple[ObsType, dict[str, SupportsFloat], bool, dict]]
 
-
-class GamaEnv(abc.ABC, gymnasium.Env):
+class ABCGamaEnv(abc.ABC, gymnasium.Env):
 
     def __init__(self,
                  host: str,
                  port: int,
                  gaml_file_path: str,
                  experiment_name: str,
-                 obs_fn: ObservationFn,
-                 step_fn: StepFn,
                  n_steps: int = 1,
+                 max_steps: int = None,
                  params: list[Any] = None) -> None:
+        self._steps = 0
+        self._max_steps = max_steps
         self._params = params or []
-        self._obs_fn = obs_fn
-        self._step_fn = step_fn
         self._client = GamaClient(host=host, port=port)
         self._gaml_file_path = gaml_file_path
         self._experiment_name = experiment_name
@@ -40,7 +36,40 @@ class GamaEnv(abc.ABC, gymnasium.Env):
             dialog=False
         )
 
-        self.agents = self._client.expression(exp_id=self._exp_id, expression='agents')[1:-1].split(', ')
+    @property
+    def client(self):
+        return self._client
+
+    @property
+    def experiment_id(self):
+        return self._exp_id
+
+
+    @property
+    @abc.abstractmethod
+    def observation_space(self):
+        pass
+
+    @property
+    @abc.abstractmethod
+    def action_space(self):
+        pass
+
+    @abc.abstractmethod
+    def get_observation(self) -> dict[str, ObsType]:
+        pass
+
+    @abc.abstractmethod
+    def get_reward(self, last_obs: ObsType, last_action: ActType) -> dict[str, SupportsFloat]:
+        pass
+
+    @abc.abstractmethod
+    def has_terminated(self, last_obs: ObsType, last_action: ActType) -> bool:
+        pass
+
+    @abc.abstractmethod
+    def apply_action(self, action: ActType) -> None:
+        pass
 
     def reset(self, *,
               seed: int | None = None,
@@ -50,17 +79,22 @@ class GamaEnv(abc.ABC, gymnasium.Env):
         params = options.get('params', self._params)
         self._client.stop(exp_id=self._exp_id)
         self._client.reload(exp_id=self._exp_id, parameters=params)
-        obs, info = self._obs_fn(self._exp_id, self._client)
-        return obs, info
-
-    @abc.abstractmethod
-    def apply_action(self, exp_id: str, client: GamaClient, action: ActType) -> None:
-        pass
+        obs = self.get_observation()
+        return obs, {}
 
     def step(self, action: ActType) -> tuple[ObsType, dict[str, SupportsFloat], bool, bool, dict[str, Any]]:
-        obs, rewards, done, info = self._step_fn(self._exp_id, self._client, action)
-        self._client.step(exp_id=self._exp_id, nb_step=self._n_steps, sync=True)
-        return obs, rewards, done, False, info
+        self.apply_action(action)
+        self.client.step(
+            exp_id=self._exp_id,
+            nb_step=self._n_steps,
+            sync=True
+        )
+        self._steps += 1
+        obs = self.get_observation()
+        reward = self.get_reward(obs, action)
+        terminated = self.has_terminated(obs, action)
+        truncated = self._steps > self._max_steps if self._max_steps else False
+        return obs, reward, terminated, truncated, {}
 
     def render(self) -> RenderFrame | list[RenderFrame] | None:
         pass

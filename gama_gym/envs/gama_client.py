@@ -100,7 +100,10 @@ class GamaClient:
         }
         return self._send_command(command)
 
-    def expression(self, exp_id: str, expression: str):
+    def expression(self, exp_id: str, expression: str, return_json_string: bool = False):
+        if return_json_string:
+            expression = f'as_json_string({expression})'
+
         command = {
             'type': 'expression',
             'exp_id': exp_id,
@@ -117,25 +120,8 @@ class GamaClient:
         res = json.loads(res)
         if res['type'] == 'UnableToExecuteRequest':
             raise ValueError(res['content'])
-        return res['content']
-
-if __name__ == '__main__':
-    client = GamaClient(host='localhost', port=6868)
-
-    model = '/TouristFlow/TouristFlow.gaml'
-    exp_id = client.load(model=model, experiment='Salzburghotelsmuseums')
-    print('Loaded experiment: ', exp_id)
-    res = client.expression(exp_id, 'length(species(people).population)')
-    while int(res) == 0:
-        client.step(exp_id=exp_id, sync=True)
-        res = client.expression(exp_id, 'length(species(people).population)')
-
-    obs = client.expression(exp_id=exp_id, expression='do get_observation;')
-    response = client.step(exp_id=exp_id, sync=True)
-    obs = client.expression(exp_id=exp_id, expression='do get_observation;')
-    response = client.expression(exp_id=exp_id, expression='nb_cells')
-    print('nb_cells: ', response)
-    response = client.expression(exp_id=exp_id, expression='agents[0].actionspace')
-    print('actspace: ', response)
-    # client.exit()
-    client.close()
+        content = res.get('content', '')
+        if len(content) > 0:
+            return json.loads(content)
+        else:
+            return None
