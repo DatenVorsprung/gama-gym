@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 with open('requirements.txt') as f:
     lines = f.read().split('\n')
@@ -20,5 +20,5 @@ setup(name='gama-gym',
               'tensorflow==2.8.0'
           ]
       },
-      py_modules=[]
+      packages=find_packages(),
       )
