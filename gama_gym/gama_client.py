@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 from typing import Any
 
 import websockets
@@ -42,7 +43,7 @@ class GamaClient:
             'parameters': [p.__dict__ for p in parameters],
             'until': until
         }
-        return self._send_command(command)
+        return self._send_command(command, decode_json=True)
 
     def exit(self):
         command = {
@@ -100,28 +101,43 @@ class GamaClient:
         }
         return self._send_command(command)
 
-    def expression(self, exp_id: str, expression: str, return_json_string: bool = False):
-        if return_json_string:
+    def expression(self, exp_id: str, expression: str, request_json_string: bool = False, decode_json: bool = False):
+        if request_json_string:
             expression = f'as_json_string({expression})'
-
+            decode_json = True
         command = {
             'type': 'expression',
             'exp_id': exp_id,
             'expr': expression
         }
-        return self._send_command(command)
+        return self._send_command(command, decode_json)
 
     def close(self):
         self._conn.close()
 
-    def _send_command(self, command):
+    def _send_command(self, command, decode_json: bool = False):
         self._conn.send(json.dumps(command))
-        res = self._conn.recv()
-        res = json.loads(res)
-        if res['type'] == 'UnableToExecuteRequest':
-            raise ValueError(res['content'])
-        content = res.get('content', '')
+        while True:
+            res = self._conn.recv()
+            res = json.loads(res)
+            if res['type'] == 'CommandExecutedSuccessfully':
+                return self._handle_successful_command(response=res, decode_json=decode_json)
+            elif 'Error' in res['type'] or res['type'] in ['UnableToExecuteRequest', 'MalformedRequest']:
+                raise ValueError(res['content'])
+            elif 'Status' in res['type']:
+                self._handle_status_message(res)
+            else:
+                raise ValueError(f'Unknown response type: {res["type"]}')
+
+    def _handle_status_message(self, res):
+        message = res['content']['message']
+        logging.info(message)
+
+    def _handle_successful_command(self, response: dict, decode_json: bool = False):
+        content = response.get('content', '')
         if len(content) > 0:
-            return json.loads(content)
+            if decode_json:
+                content = json.loads(content)
+            return content
         else:
             return None

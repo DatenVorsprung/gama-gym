@@ -10,7 +10,7 @@ with open('requirements.txt') as f:
         else:
             requirements.append(line)
 
-setup(name='GamaEnv',
+setup(name='gama-gym',
       version='0.0.1',
       install_requires=requirements,
       extras_require={

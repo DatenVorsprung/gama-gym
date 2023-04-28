@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import abc
-from typing import Any, SupportsFloat, Callable
+from typing import Any, SupportsFloat
 
 import gymnasium
 from gymnasium.core import RenderFrame, ObsType, ActType
 
-from gama_gym.envs.gama_client import GamaClient
+from gama_gym.gama_client import GamaClient
 
 
 class ABCGamaEnv(abc.ABC, gymnasium.Env):
@@ -32,8 +32,8 @@ class ABCGamaEnv(abc.ABC, gymnasium.Env):
             experiment=self._experiment_name,
             parameters=self._params,
             console=False,
-            status=False,
-            dialog=False
+            status=True,
+            dialog=True
         )
 
     @property
@@ -82,6 +82,14 @@ class ABCGamaEnv(abc.ABC, gymnasium.Env):
         obs = self.get_observation()
         return obs, {}
 
+    def _get_info(self) -> dict[str, Any]:
+        return {
+            'cycle': self._client.expression(exp_id=self._exp_id, expression='cycle'),
+            'step': self._client.expression(exp_id=self._exp_id, expression='step'),
+            'cycle_duration': self._client.expression(exp_id=self._exp_id, expression='duration'),
+            'total_duration': self._client.expression(exp_id=self._exp_id, expression='total_duration'),
+        }
+
     def step(self, action: ActType) -> tuple[ObsType, dict[str, SupportsFloat], bool, bool, dict[str, Any]]:
         self.apply_action(action)
         self.client.step(
@@ -89,12 +97,14 @@ class ABCGamaEnv(abc.ABC, gymnasium.Env):
             nb_step=self._n_steps,
             sync=True
         )
+
         self._steps += 1
         obs = self.get_observation()
         reward = self.get_reward(obs, action)
         terminated = self.has_terminated(obs, action)
         truncated = self._steps > self._max_steps if self._max_steps else False
-        return obs, reward, terminated, truncated, {}
+        info = self._get_info()
+        return obs, reward, terminated, truncated, info
 
     def render(self) -> RenderFrame | list[RenderFrame] | None:
         pass
